@@ -6,6 +6,10 @@ echo "Installing Mac Agent..."
 if ! command -v brew &> /dev/null; then
   echo "Installing Homebrew..."
   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+  # Add Homebrew to PATH immediately
+  echo >> /Users/$(whoami)/.zprofile
+  echo 'eval "$(/opt/homebrew/bin/brew shellenv zsh)"' >> /Users/$(whoami)/.zprofile
+  eval "$(/opt/homebrew/bin/brew shellenv zsh)"
 fi
 
 # Install Node if not present
@@ -31,7 +35,9 @@ npm install
 # Get current user and paths
 CURRENT_USER=$(whoami)
 AGENT_PATH=$(pwd)
-NODE_PATH=$(which node)
+NODE_PATH=$(which node)  # dynamically detect node path
+
+echo "Using node at: $NODE_PATH"
 
 # Create launchd plist
 sudo tee /Library/LaunchDaemons/com.macagent.plist > /dev/null <<EOF
@@ -67,8 +73,10 @@ EOF
 echo "${CURRENT_USER} ALL=(ALL) NOPASSWD: /usr/bin/osascript" | sudo tee /etc/sudoers.d/mac-agent > /dev/null
 
 # Load the agent
+sudo launchctl unload /Library/LaunchDaemons/com.macagent.plist 2>/dev/null
 sudo launchctl load /Library/LaunchDaemons/com.macagent.plist
 
 echo ""
 echo "✅ Mac Agent installed and running on port 1299"
+echo "✅ Node path: $NODE_PATH"
 echo "✅ Will auto-start on every reboot"
