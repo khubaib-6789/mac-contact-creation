@@ -111,8 +111,3 @@ echo "    so their Contacts session stays active in background."
 echo ""
 echo "⚠️  First API call will trigger a Contacts permission dialog."
 echo "    Click 'OK' to allow."
-
-echo ""
-echo "Triggering Contacts permission dialog..."
-echo "⚠️  A permission dialog will appear — click 'OK' to allow."
-open -W -n "${APP_PATH}" --args "Permission" "Setup" "+10000000000" "" || true
