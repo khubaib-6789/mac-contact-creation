@@ -42,21 +42,6 @@ async function ensureBinary() {
   }
 }
 
-async function triggerContactsPermission() {
-  console.log('Triggering Contacts permission check...')
-  try {
-    // Run the binary with dummy args — this triggers TCC dialog if not yet granted
-    const { stdout, stderr } = await execAsync(`${BINARY_PATH} "_PermCheck" "_Trigger" "+10000000000" ""`)
-    console.log('Permission check result:', stdout.trim())
-    
-    // Clean up the dummy contact
-    await execAsync(`${BINARY_PATH} --delete "_PermCheck" "_Trigger"`).catch(() => {})
-  } catch (err) {
-    console.log('Permission not yet granted. macOS should show a dialog.')
-    console.log('Click "OK" on the dialog, then retry your API call.')
-  }
-}
-
 app.post('/create-contact', async (req, res) => {
   const { user, firstName, lastName, email, phone } = req.body
 
@@ -65,7 +50,7 @@ app.post('/create-contact', async (req, res) => {
 
   const escape = (s) => `"${String(s).replace(/"/g, '\\"')}"`
   const args = [firstName, lastName, phone, email || ''].map(escape).join(' ')
-  const cmd = `sudo -u ${user} ${BINARY_PATH} ${args}`
+  const cmd = `"${BINARY_PATH}" ${args}`
 
   exec(cmd, (err, stdout, stderr) => {
     console.log('CMD:', cmd)
@@ -80,5 +65,4 @@ app.post('/create-contact', async (req, res) => {
 })
 
 await ensureBinary()
-await triggerContactsPermission()
 app.listen(PORT, () => console.log(`Agent running on :${PORT}`))
