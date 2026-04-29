@@ -73,7 +73,7 @@ app.post('/create-contact', async (req, res) => {
     const uid = await getUserId(user)
     cmd = user === CURRENT_USER
       ? `/usr/bin/open -W -n "${APP_PATH}" --args ${args}`
-      : `sudo -u "${user}" /bin/launchctl asuser ${uid} /usr/bin/open -W -n "${APP_PATH}" --args ${args}`
+      : `sudo /bin/launchctl asuser ${uid} /usr/bin/sudo -u "${user}" /usr/bin/open -W -n "${APP_PATH}" --args ${args}`
   } catch (err) {
     return res.status(400).json({ error: err.message })
   }
