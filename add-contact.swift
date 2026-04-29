@@ -12,6 +12,23 @@ let lastName = args[2]
 let phone = args[3]
 let email = args.count > 4 ? args[4] : ""
 
+let store = CNContactStore()
+let semaphore = DispatchSemaphore(value: 0)
+var accessGranted = false
+var accessError: Error?
+
+store.requestAccess(for: .contacts) { granted, error in
+    accessGranted = granted
+    accessError = error
+    semaphore.signal()
+}
+semaphore.wait()
+
+if !accessGranted {
+    print("Error: Contacts access denied. \(accessError?.localizedDescription ?? "")")
+    exit(1)
+}
+
 let contact = CNMutableContact()
 contact.givenName = firstName
 contact.familyName = lastName
@@ -25,7 +42,6 @@ if !email.isEmpty {
         value: email as NSString)]
 }
 
-let store = CNContactStore()
 let request = CNSaveRequest()
 request.add(contact, toContainerWithIdentifier: nil)
 
