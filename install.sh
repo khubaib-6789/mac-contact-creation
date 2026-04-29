@@ -2,11 +2,37 @@
 
 echo "Installing Mac Agent..."
 
+# Install Xcode Command Line Tools headlessly if not present
+if ! swiftc --version &>/dev/null 2>&1 || ! /usr/bin/swiftc --version 2>&1 | grep -q "Swift version"; then
+  echo "Installing Xcode Command Line Tools (this takes a few minutes)..."
+  
+  # Trick to make softwareupdate see CLT as available
+  sudo touch /tmp/.com.apple.dt.CommandLineTools.installondemand.in-progress
+  
+  # Find the latest CLT package and install it
+  CLT_PACKAGE=$(softwareupdate -l 2>&1 | grep -B 1 "Command Line Tools" | awk -F'*' '/^ *\*/ {print $2}' | sed -e 's/^ *Label: //' -e 's/^ *//' | sort -V | tail -n1)
+  
+  if [ -n "$CLT_PACKAGE" ]; then
+    sudo softwareupdate -i "$CLT_PACKAGE" --verbose
+  else
+    echo "Could not find Command Line Tools package automatically"
+    sudo softwareupdate -i -a --verbose
+  fi
+  
+  sudo rm -f /tmp/.com.apple.dt.CommandLineTools.installondemand.in-progress
+  
+  # Verify
+  if ! swiftc --version &>/dev/null; then
+    echo "❌ Failed to install Xcode Command Line Tools"
+    exit 1
+  fi
+  echo "✅ Xcode Command Line Tools installed"
+fi
+
 # Install Homebrew if not present
 if ! command -v brew &> /dev/null; then
   echo "Installing Homebrew..."
-  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-  # Add Homebrew to PATH immediately
+  NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
   echo >> /Users/$(whoami)/.zprofile
   echo 'eval "$(/opt/homebrew/bin/brew shellenv zsh)"' >> /Users/$(whoami)/.zprofile
   eval "$(/opt/homebrew/bin/brew shellenv zsh)"
@@ -33,10 +59,14 @@ curl -fsSL https://raw.githubusercontent.com/khubaib-6789/mac-contact-creation/m
 # Install dependencies
 npm install
 
+# Pre-compile the Swift binary
+echo "Compiling Swift binary..."
+swiftc add-contact.swift -o add-contact
+
 # Get current user and paths
 CURRENT_USER=$(whoami)
 AGENT_PATH=$(pwd)
-NODE_PATH=$(which node)  # dynamically detect node path
+NODE_PATH=$(which node)
 
 echo "Using node at: $NODE_PATH"
 
@@ -71,7 +101,7 @@ sudo tee /Library/LaunchDaemons/com.macagent.plist > /dev/null <<EOF
 EOF
 
 # Set sudoers permission
-echo "${CURRENT_USER} ALL=(ALL) NOPASSWD: /usr/bin/osascript" | sudo tee /etc/sudoers.d/mac-agent > /dev/null
+echo "${CURRENT_USER} ALL=(ALL) NOPASSWD: /usr/bin/osascript, ${AGENT_PATH}/add-contact" | sudo tee /etc/sudoers.d/mac-agent > /dev/null
 
 # Load the agent
 sudo launchctl unload /Library/LaunchDaemons/com.macagent.plist 2>/dev/null
@@ -79,5 +109,4 @@ sudo launchctl load /Library/LaunchDaemons/com.macagent.plist
 
 echo ""
 echo "✅ Mac Agent installed and running on port 1299"
-echo "✅ Node path: $NODE_PATH"
 echo "✅ Will auto-start on every reboot"
