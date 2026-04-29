@@ -1,12 +1,13 @@
 #!/bin/bash
 
+set -e
 echo "Installing Mac Agent..."
 
 # Install Xcode Command Line Tools if not present
-if ! swiftc --version &>/dev/null 2>&1 || ! /usr/bin/swiftc --version 2>&1 | grep -q "Swift version"; then
+if ! swiftc --version &>/dev/null; then
   echo "Installing Xcode Command Line Tools..."
-  sudo xcode-select --install
-  echo "Click Install on the dialog. Waiting for installation to complete..."
+  sudo xcode-select --install 2>/dev/null || true
+  echo "If a dialog appears, click Install. Waiting for installation..."
   until swiftc --version &>/dev/null; do
     sleep 10
   done
@@ -17,9 +18,13 @@ fi
 if ! command -v brew &> /dev/null; then
   echo "Installing Homebrew..."
   NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-  echo >> /Users/$(whoami)/.zprofile
-  echo 'eval "$(/opt/homebrew/bin/brew shellenv zsh)"' >> /Users/$(whoami)/.zprofile
-  eval "$(/opt/homebrew/bin/brew shellenv zsh)"
+  if [[ -d "/opt/homebrew" ]]; then
+    echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
+    eval "$(/opt/homebrew/bin/brew shellenv)"
+  else
+    echo 'eval "$(/usr/local/bin/brew shellenv)"' >> ~/.zprofile
+    eval "$(/usr/local/bin/brew shellenv)"
+  fi
 fi
 
 # Install Node if not present
@@ -35,7 +40,8 @@ read -p "Enter your API key: " API_KEY
 mkdir -p ~/mac-agent
 cd ~/mac-agent
 
-# Download agent files
+# Download files
+echo "Downloading agent files..."
 curl -fsSL https://raw.githubusercontent.com/khubaib-6789/mac-contact-creation/main/agent.js -o agent.js
 curl -fsSL https://raw.githubusercontent.com/khubaib-6789/mac-contact-creation/main/package.json -o package.json
 curl -fsSL https://raw.githubusercontent.com/khubaib-6789/mac-contact-creation/main/add-contact.swift -o add-contact.swift
@@ -48,12 +54,18 @@ echo "Compiling Swift binary..."
 swiftc add-contact.swift -o add-contact
 
 # Get paths
+CURRENT_USER=$(whoami)
 AGENT_PATH=$(pwd)
 NODE_PATH=$(which node)
 
-echo "Using node at: $NODE_PATH"
+# Allow this user to sudo without password for the binary (so agent can run as other users)
+echo "${CURRENT_USER} ALL=(ALL) NOPASSWD: ${AGENT_PATH}/add-contact" | sudo tee /etc/sudoers.d/mac-agent > /dev/null
 
-# Create LaunchAgent (runs in user's GUI session - critical for TCC/Contacts access)
+# Remove any old LaunchDaemon if present
+sudo launchctl unload /Library/LaunchDaemons/com.macagent.plist 2>/dev/null || true
+sudo rm -f /Library/LaunchDaemons/com.macagent.plist
+
+# Create LaunchAgent (runs in user's GUI session — required for Contacts/TCC access)
 mkdir -p ~/Library/LaunchAgents
 cat > ~/Library/LaunchAgents/com.macagent.plist <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -84,13 +96,17 @@ cat > ~/Library/LaunchAgents/com.macagent.plist <<EOF
 </plist>
 EOF
 
-# Load WITHOUT sudo (keeps it in user GUI session for Contacts/TCC access)
-launchctl unload ~/Library/LaunchAgents/com.macagent.plist 2>/dev/null
+# Load WITHOUT sudo (critical — keeps it in user GUI session for TCC/Contacts access)
+launchctl unload ~/Library/LaunchAgents/com.macagent.plist 2>/dev/null || true
 launchctl load ~/Library/LaunchAgents/com.macagent.plist
 
 echo ""
 echo "✅ Mac Agent installed and running on port 1299"
 echo "✅ Will auto-start when this user logs in"
 echo ""
-echo "⚠️  IMPORTANT: Make sure to log into each user once via Fast User Switching"
-echo "    after every reboot for their agent to run."
+echo "⚠️  IMPORTANT after every reboot:"
+echo "    Log into each user once via Fast User Switching"
+echo "    so their Contacts session stays active in background."
+echo ""
+echo "⚠️  First API call will trigger a Contacts permission dialog."
+echo "    Click 'OK' to allow."

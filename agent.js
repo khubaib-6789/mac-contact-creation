@@ -1,9 +1,7 @@
 import express from 'express'
 import { exec } from 'child_process'
-import { writeFile, unlink, stat } from 'fs/promises'
-import { randomUUID } from 'crypto'
+import { stat } from 'fs/promises'
 import { promisify } from 'util'
-import os from 'os'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
@@ -58,12 +56,9 @@ app.post('/create-contact', async (req, res) => {
     console.log('CMD:', cmd)
     console.log('STDOUT:', stdout)
     console.log('STDERR:', stderr)
-    console.log('ERR:', err)
     if (err) return res.status(500).json({
-      error: stderr || err.message,
-      stdout: stdout,
-      stderr: stderr,
-      code: err.code
+      error: stderr || stdout || err.message,
+      stdout, stderr, code: err.code
     })
     res.json({ success: true, message: stdout.trim() })
   })
