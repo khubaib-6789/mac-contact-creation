@@ -24,6 +24,7 @@ const INFO_PLIST = path.join(__dirname, 'Info.plist')
 const APP_PATH = path.join(__dirname, 'MacAgentContactHelper.app')
 const BINARY_PATH = path.join(APP_PATH, 'Contents', 'MacOS', 'add-contact')
 const APP_PLIST_PATH = path.join(APP_PATH, 'Contents', 'Info.plist')
+const CURRENT_USER = process.env.USER
 
 async function ensureBinary() {
   try {
@@ -48,6 +49,15 @@ async function ensureBinary() {
   }
 }
 
+async function getUserId(user) {
+  if (!/^[A-Za-z0-9._-]+$/.test(user)) {
+    throw new Error('Invalid user')
+  }
+
+  const { stdout } = await execAsync(`id -u "${user}"`)
+  return stdout.trim()
+}
+
 app.post('/create-contact', async (req, res) => {
   const { user, firstName, lastName, email, phone } = req.body
 
@@ -57,7 +67,16 @@ app.post('/create-contact', async (req, res) => {
   const escape = (s) => `"${String(s).replace(/"/g, '\\"')}"`
   const resultPath = path.join('/tmp', `mac-agent-contact-${Date.now()}-${Math.random().toString(16).slice(2)}.json`)
   const args = [firstName, lastName, phone, email || '', '--result', resultPath].map(escape).join(' ')
-  const cmd = `open -W -n "${APP_PATH}" --args ${args}`
+  let cmd
+
+  try {
+    const uid = await getUserId(user)
+    cmd = user === CURRENT_USER
+      ? `/usr/bin/open -W -n "${APP_PATH}" --args ${args}`
+      : `sudo -u "${user}" /bin/launchctl asuser ${uid} /usr/bin/open -W -n "${APP_PATH}" --args ${args}`
+  } catch (err) {
+    return res.status(400).json({ error: err.message })
+  }
 
   exec(cmd, async (err, stdout, stderr) => {
     console.log('CMD:', cmd)

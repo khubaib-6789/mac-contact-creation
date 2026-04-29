@@ -36,9 +36,12 @@ fi
 # Ask for API key
 read -p "Enter your API key: " API_KEY
 
-# Create agent folder
-mkdir -p ~/mac-agent
-cd ~/mac-agent
+# Create shared agent folder so every logged-in user can launch the helper app
+AGENT_DIR="/Users/Shared/mac-agent"
+sudo mkdir -p "${AGENT_DIR}"
+sudo chown -R "$(whoami)":staff "${AGENT_DIR}"
+chmod 755 "${AGENT_DIR}"
+cd "${AGENT_DIR}"
 
 # Download files
 echo "Downloading agent files..."
@@ -61,6 +64,9 @@ swiftc add-contact.swift -o "${APP_PATH}/Contents/MacOS/add-contact" -Xlinker -s
 CURRENT_USER=$(whoami)
 AGENT_PATH=$(pwd)
 NODE_PATH=$(which node)
+
+# Allow this agent to open the helper inside another logged-in user's GUI session.
+echo "${CURRENT_USER} ALL=(ALL) NOPASSWD: /bin/launchctl" | sudo tee /etc/sudoers.d/mac-agent > /dev/null
 
 # Remove any old LaunchDaemon if present
 sudo launchctl unload /Library/LaunchDaemons/com.macagent.plist 2>/dev/null || true
