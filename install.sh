@@ -45,13 +45,14 @@ echo "Downloading agent files..."
 curl -fsSL https://raw.githubusercontent.com/khubaib-6789/mac-contact-creation/main/agent.js -o agent.js
 curl -fsSL https://raw.githubusercontent.com/khubaib-6789/mac-contact-creation/main/package.json -o package.json
 curl -fsSL https://raw.githubusercontent.com/khubaib-6789/mac-contact-creation/main/add-contact.swift -o add-contact.swift
+curl -fsSL https://raw.githubusercontent.com/khubaib-6789/mac-contact-creation/main/Info.plist -o Info.plist
 
 # Install dependencies
 npm install
 
 # Compile Swift binary
 echo "Compiling Swift binary..."
-swiftc add-contact.swift -o add-contact
+swiftc add-contact.swift -o add-contact -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist -Xlinker Info.plist
 
 # Get paths
 CURRENT_USER=$(whoami)

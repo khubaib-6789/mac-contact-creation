@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>com.macagent.add-contact</string>
+    <key>CFBundleName</key>
+    <string>Mac Agent Contact Helper</string>
+    <key>CFBundleDisplayName</key>
+    <string>Mac Agent Contact Helper</string>
+    <key>CFBundleExecutable</key>
+    <string>add-contact</string>
+    <key>CFBundleVersion</key>
+    <string>1.0</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>NSContactsUsageDescription</key>
+    <string>Mac Agent needs Contacts access to create contacts from API requests.</string>
+</dict>
+</plist>

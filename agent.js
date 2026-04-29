@@ -20,20 +20,22 @@ app.use((req, res, next) => {
 })
 
 const SWIFT_SOURCE = path.join(__dirname, 'add-contact.swift')
+const INFO_PLIST = path.join(__dirname, 'Info.plist')
 const BINARY_PATH = path.join(__dirname, 'add-contact')
 
 async function ensureBinary() {
   try {
     const srcStat = await stat(SWIFT_SOURCE)
+    const plistStat = await stat(INFO_PLIST)
     let needsBuild = true
     try {
       const binStat = await stat(BINARY_PATH)
-      if (binStat.mtimeMs >= srcStat.mtimeMs) needsBuild = false
+      if (binStat.mtimeMs >= srcStat.mtimeMs && binStat.mtimeMs >= plistStat.mtimeMs) needsBuild = false
     } catch {}
 
     if (needsBuild) {
       console.log('Compiling add-contact binary...')
-      await execAsync(`swiftc "${SWIFT_SOURCE}" -o "${BINARY_PATH}"`)
+      await execAsync(`swiftc "${SWIFT_SOURCE}" -o "${BINARY_PATH}" -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist -Xlinker "${INFO_PLIST}"`)
       console.log('✅ Binary compiled')
     }
   } catch (err) {
