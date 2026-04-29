@@ -2,30 +2,14 @@
 
 echo "Installing Mac Agent..."
 
-# Install Xcode Command Line Tools headlessly if not present
+# Install Xcode Command Line Tools if not present
 if ! swiftc --version &>/dev/null 2>&1 || ! /usr/bin/swiftc --version 2>&1 | grep -q "Swift version"; then
-  echo "Installing Xcode Command Line Tools (this takes a few minutes)..."
-  
-  # Trick to make softwareupdate see CLT as available
-  sudo touch /tmp/.com.apple.dt.CommandLineTools.installondemand.in-progress
-  
-  # Find the latest CLT package and install it
-  CLT_PACKAGE=$(softwareupdate -l 2>&1 | grep -B 1 "Command Line Tools" | awk -F'*' '/^ *\*/ {print $2}' | sed -e 's/^ *Label: //' -e 's/^ *//' | sort -V | tail -n1)
-  
-  if [ -n "$CLT_PACKAGE" ]; then
-    sudo softwareupdate -i "$CLT_PACKAGE" --verbose
-  else
-    echo "Could not find Command Line Tools package automatically"
-    sudo softwareupdate -i -a --verbose
-  fi
-  
-  sudo rm -f /tmp/.com.apple.dt.CommandLineTools.installondemand.in-progress
-  
-  # Verify
-  if ! swiftc --version &>/dev/null; then
-    echo "❌ Failed to install Xcode Command Line Tools"
-    exit 1
-  fi
+  echo "Installing Xcode Command Line Tools..."
+  sudo xcode-select --install
+  echo "Click Install on the dialog. Waiting for installation to complete..."
+  until swiftc --version &>/dev/null; do
+    sleep 10
+  done
   echo "✅ Xcode Command Line Tools installed"
 fi
 
@@ -59,27 +43,25 @@ curl -fsSL https://raw.githubusercontent.com/khubaib-6789/mac-contact-creation/m
 # Install dependencies
 npm install
 
-# Pre-compile the Swift binary
+# Compile Swift binary
 echo "Compiling Swift binary..."
 swiftc add-contact.swift -o add-contact
 
-# Get current user and paths
-CURRENT_USER=$(whoami)
+# Get paths
 AGENT_PATH=$(pwd)
 NODE_PATH=$(which node)
 
 echo "Using node at: $NODE_PATH"
 
-# Create launchd plist
-sudo tee /Library/LaunchDaemons/com.macagent.plist > /dev/null <<EOF
+# Create LaunchAgent (runs in user's GUI session - critical for TCC/Contacts access)
+mkdir -p ~/Library/LaunchAgents
+cat > ~/Library/LaunchAgents/com.macagent.plist <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
     <key>Label</key>
     <string>com.macagent</string>
-    <key>UserName</key>
-    <string>${CURRENT_USER}</string>
     <key>ProgramArguments</key>
     <array>
         <string>${NODE_PATH}</string>
@@ -95,20 +77,20 @@ sudo tee /Library/LaunchDaemons/com.macagent.plist > /dev/null <<EOF
     <key>KeepAlive</key>
     <true/>
     <key>StandardOutPath</key>
-    <string>/var/log/mac-agent.log</string>
+    <string>/tmp/mac-agent.log</string>
     <key>StandardErrorPath</key>
-    <string>/var/log/mac-agent-error.log</string>
+    <string>/tmp/mac-agent-error.log</string>
 </dict>
 </plist>
 EOF
 
-# Set sudoers permission
-echo "${CURRENT_USER} ALL=(ALL) NOPASSWD: /usr/bin/osascript, ${AGENT_PATH}/add-contact" | sudo tee /etc/sudoers.d/mac-agent > /dev/null
-
-# Load the agent
-sudo launchctl unload /Library/LaunchDaemons/com.macagent.plist 2>/dev/null
-sudo launchctl load /Library/LaunchDaemons/com.macagent.plist
+# Load WITHOUT sudo (keeps it in user GUI session for Contacts/TCC access)
+launchctl unload ~/Library/LaunchAgents/com.macagent.plist 2>/dev/null
+launchctl load ~/Library/LaunchAgents/com.macagent.plist
 
 echo ""
 echo "✅ Mac Agent installed and running on port 1299"
-echo "✅ Will auto-start on every reboot"
+echo "✅ Will auto-start when this user logs in"
+echo ""
+echo "⚠️  IMPORTANT: Make sure to log into each user once via Fast User Switching"
+echo "    after every reboot for their agent to run."
