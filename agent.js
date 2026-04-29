@@ -1,6 +1,6 @@
 import express from 'express'
 import { exec } from 'child_process'
-import { stat } from 'fs/promises'
+import { mkdir, readFile, stat } from 'fs/promises'
 import { promisify } from 'util'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -21,7 +21,9 @@ app.use((req, res, next) => {
 
 const SWIFT_SOURCE = path.join(__dirname, 'add-contact.swift')
 const INFO_PLIST = path.join(__dirname, 'Info.plist')
-const BINARY_PATH = path.join(__dirname, 'add-contact')
+const APP_PATH = path.join(__dirname, 'MacAgentContactHelper.app')
+const BINARY_PATH = path.join(APP_PATH, 'Contents', 'MacOS', 'add-contact')
+const APP_PLIST_PATH = path.join(APP_PATH, 'Contents', 'Info.plist')
 
 async function ensureBinary() {
   try {
@@ -35,6 +37,8 @@ async function ensureBinary() {
 
     if (needsBuild) {
       console.log('Compiling add-contact binary...')
+      await mkdir(path.dirname(BINARY_PATH), { recursive: true })
+      await execAsync(`cp "${INFO_PLIST}" "${APP_PLIST_PATH}"`)
       await execAsync(`swiftc "${SWIFT_SOURCE}" -o "${BINARY_PATH}" -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist -Xlinker "${INFO_PLIST}"`)
       console.log('✅ Binary compiled')
     }
@@ -51,18 +55,26 @@ app.post('/create-contact', async (req, res) => {
     return res.status(400).json({ error: 'Missing required fields' })
 
   const escape = (s) => `"${String(s).replace(/"/g, '\\"')}"`
-  const args = [firstName, lastName, phone, email || ''].map(escape).join(' ')
-  const cmd = `"${BINARY_PATH}" ${args}`
+  const resultPath = path.join('/tmp', `mac-agent-contact-${Date.now()}-${Math.random().toString(16).slice(2)}.json`)
+  const args = [firstName, lastName, phone, email || '', '--result', resultPath].map(escape).join(' ')
+  const cmd = `open -W -n "${APP_PATH}" --args ${args}`
 
-  exec(cmd, (err, stdout, stderr) => {
+  exec(cmd, async (err, stdout, stderr) => {
     console.log('CMD:', cmd)
     console.log('STDOUT:', stdout)
     console.log('STDERR:', stderr)
-    if (err) return res.status(500).json({
-      error: stderr || stdout || err.message,
-      stdout, stderr, code: err.code
+    let result = null
+    try {
+      result = JSON.parse(await readFile(resultPath, 'utf8'))
+    } catch {}
+
+    if (err || !result?.success) return res.status(500).json({
+      error: result?.error || stderr || stdout || err?.message || 'Contact helper failed',
+      stdout,
+      stderr,
+      code: err?.code
     })
-    res.json({ success: true, message: stdout.trim() })
+    res.json({ success: true, message: result.message || 'Contact created successfully' })
   })
 })
 

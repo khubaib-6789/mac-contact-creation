@@ -1,16 +1,43 @@
 import Contacts
 import Foundation
 
-let args = CommandLine.arguments
-guard args.count >= 4 else {
-    print("Usage: add-contact <firstName> <lastName> <phone> [email]")
-    exit(1)
+var args = Array(CommandLine.arguments.dropFirst())
+var resultPath: String?
+
+if let resultIndex = args.firstIndex(of: "--result"), resultIndex + 1 < args.count {
+    resultPath = args[resultIndex + 1]
+    args.removeSubrange(resultIndex...resultIndex + 1)
 }
 
-let firstName = args[1]
-let lastName = args[2]
-let phone = args[3]
-let email = args.count > 4 ? args[4] : ""
+func finish(success: Bool, message: String? = nil, error: String? = nil) -> Never {
+    var payload: [String: Any] = ["success": success]
+    if let message {
+        payload["message"] = message
+        print(message)
+    }
+    if let error {
+        payload["error"] = error
+        print("Error: \(error)")
+    }
+
+    if let resultPath,
+       let data = try? JSONSerialization.data(withJSONObject: payload, options: []),
+       let json = String(data: data, encoding: .utf8) {
+        try? json.write(toFile: resultPath, atomically: true, encoding: .utf8)
+    }
+
+    exit(success ? 0 : 1)
+}
+
+guard args.count >= 3 else {
+    print("Usage: add-contact <firstName> <lastName> <phone> [email]")
+    finish(success: false, error: "Usage: add-contact <firstName> <lastName> <phone> [email]")
+}
+
+let firstName = args[0]
+let lastName = args[1]
+let phone = args[2]
+let email = args.count > 3 ? args[3] : ""
 
 let store = CNContactStore()
 let semaphore = DispatchSemaphore(value: 0)
@@ -25,8 +52,7 @@ store.requestAccess(for: .contacts) { granted, error in
 semaphore.wait()
 
 if !accessGranted {
-    print("Error: Contacts access denied. \(accessError?.localizedDescription ?? "")")
-    exit(1)
+    finish(success: false, error: "Contacts access denied. \(accessError?.localizedDescription ?? "")")
 }
 
 let contact = CNMutableContact()
@@ -47,8 +73,7 @@ request.add(contact, toContainerWithIdentifier: nil)
 
 do {
     try store.execute(request)
-    print("Contact created successfully")
+    finish(success: true, message: "Contact created successfully")
 } catch {
-    print("Error: \(error.localizedDescription)")
-    exit(1)
+    finish(success: false, error: error.localizedDescription)
 }

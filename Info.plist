@@ -10,6 +10,8 @@
     <string>Mac Agent Contact Helper</string>
     <key>CFBundleExecutable</key>
     <string>add-contact</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
     <key>CFBundleVersion</key>
     <string>1.0</string>
     <key>CFBundleShortVersionString</key>

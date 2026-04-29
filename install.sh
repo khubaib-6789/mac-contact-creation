@@ -52,15 +52,15 @@ npm install
 
 # Compile Swift binary
 echo "Compiling Swift binary..."
-swiftc add-contact.swift -o add-contact -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist -Xlinker Info.plist
+APP_PATH="$(pwd)/MacAgentContactHelper.app"
+mkdir -p "${APP_PATH}/Contents/MacOS"
+cp Info.plist "${APP_PATH}/Contents/Info.plist"
+swiftc add-contact.swift -o "${APP_PATH}/Contents/MacOS/add-contact" -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist -Xlinker Info.plist
 
 # Get paths
 CURRENT_USER=$(whoami)
 AGENT_PATH=$(pwd)
 NODE_PATH=$(which node)
-
-# Allow this user to sudo without password for the binary (so agent can run as other users)
-echo "${CURRENT_USER} ALL=(ALL) NOPASSWD: ${AGENT_PATH}/add-contact" | sudo tee /etc/sudoers.d/mac-agent > /dev/null
 
 # Remove any old LaunchDaemon if present
 sudo launchctl unload /Library/LaunchDaemons/com.macagent.plist 2>/dev/null || true
@@ -115,4 +115,4 @@ echo "    Click 'OK' to allow."
 echo ""
 echo "Triggering Contacts permission dialog..."
 echo "⚠️  A permission dialog will appear — click 'OK' to allow."
-${AGENT_PATH}/add-contact "Permission" "Setup" "+10000000000" "" || true
+open -W -n "${APP_PATH}" --args "Permission" "Setup" "+10000000000" "" || true
