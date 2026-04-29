@@ -55,7 +55,16 @@ app.post('/create-contact', async (req, res) => {
   const cmd = `sudo -u ${user} ${BINARY_PATH} ${args}`
 
   exec(cmd, (err, stdout, stderr) => {
-    if (err) return res.status(500).json({ error: stderr || err.message })
+    console.log('CMD:', cmd)
+    console.log('STDOUT:', stdout)
+    console.log('STDERR:', stderr)
+    console.log('ERR:', err)
+    if (err) return res.status(500).json({
+      error: stderr || err.message,
+      stdout: stdout,
+      stderr: stderr,
+      code: err.code
+    })
     res.json({ success: true, message: stdout.trim() })
   })
 })
