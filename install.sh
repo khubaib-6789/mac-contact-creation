@@ -78,6 +78,8 @@ sudo tee /Library/LaunchDaemons/com.macagent.plist > /dev/null <<EOF
 <dict>
     <key>Label</key>
     <string>com.macagent</string>
+    <key>UserName</key>
+    <string>${CURRENT_USER}</string>
     <key>ProgramArguments</key>
     <array>
         <string>${NODE_PATH}</string>
